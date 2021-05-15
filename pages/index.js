@@ -1,65 +1,76 @@
 import Head from 'next/head'
+import Router from 'next/dist/next-server/lib/router/router'
 import styles from '../styles/Home.module.css'
+import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { createGlobalStyle } from 'styled-components';
+
+import Card from '../components/card';
 
 export default function Home() {
+  const [deckId, setDeckId] = useState('');
+  const [playerHand, setPLayerHand] = useState([]);
+  const [remainingCards, setRemainingCards] = useState(0);
+  const [playing, setPLaying] = useState(false);
+
+  useEffect(() => {
+    let id = (deckId === '' || deckId === undefined) ? 'new' : deckId;
+    fetch(`https://deckofcardsapi.com/api/deck/${id}/shuffle/?deck_count=2`)
+      .then(response => {
+        return response.json();
+      })
+      .then(data => {
+        setDeckId(data.deck_id);
+        setRemainingCards(data.remaining);
+      })
+      .catch(error => {
+        console.error(error);
+      })
+  }, []);
+
+  async function DealHands() {
+    setPLaying(true);
+    await fetch(`https://deckofcardsapi.com/api/deck/${deckId}/shuffle/`);
+    fetch(`https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=2`)
+      .then(response => {
+        return response.json();
+      })
+      .then(data => {
+        setPLayerHand(data.cards);
+        setRemainingCards(data.remaining);
+      })
+      .catch(error => console.error(error));
+  }
+
+  function BetRender() {
+    return (
+      <button onClick={DealHands} >PLAY</button>
+    )
+  }
+
+  function PlayRender() {
+    return (
+      <div>
+        {playerHand.map(card => {
+          return (<Card card={card} />);
+        })}
+        <button onClick={() => setPLaying(false)} >TILBAKE</button>
+      </div>
+    )
+  }
+
   return (
-    <div className={styles.container}>
-      <Head>
-        <title>Create Next App</title>
-        <link rel="icon" href="/favicon.ico" />
-      </Head>
-
-      <main className={styles.main}>
-        <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
-        </h1>
-
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
-
-        <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h3>Documentation &rarr;</h3>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h3>Learn &rarr;</h3>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/master/examples"
-            className={styles.card}
-          >
-            <h3>Examples &rarr;</h3>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h3>Deploy &rarr;</h3>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
-        </div>
-      </main>
-
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Powered by{' '}
-          <img src="/vercel.svg" alt="Vercel Logo" className={styles.logo} />
-        </a>
-      </footer>
-    </div>
+    <>
+      <GlobalStyle />
+      {playing ? <PlayRender /> : <BetRender />}
+      <p>Remaining Cards: {remainingCards}</p>
+    </>
   )
 }
+
+const GlobalStyle = createGlobalStyle``;
+
+//export async function getStaticProps() {
+//  const res = await fetch();
+//  const post = await res.json();
+//}
