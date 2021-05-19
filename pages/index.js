@@ -10,7 +10,7 @@ import Card from '../components/card';
 export default function Home() {
   const [deckId, setDeckId] = useState('');
 
-  const [playerHand, setPLayerHand] = useState([]);
+  const [playerHand, setPlayerHand] = useState([]);
   const [dealerHand, setDealerHand] = useState([]);
   const [splitHand, setSplitHand] = useState([]);
 
@@ -21,6 +21,7 @@ export default function Home() {
   const [roundOverMsg, setRoundOverMsg] = useState("");
 
   const [stand, setStand] = useState(false);
+  const [hideCard, setHideCard] = useState(false);
 
   const [playError, setPlayError] = useState("");
 
@@ -42,6 +43,7 @@ export default function Home() {
   useEffect(() => {
     const Draw = async () => {
       if (CalculateScore(dealerHand) < 17 && stand) {
+        setHideCard(false);
         await fetch(`https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=1`)
           .then(response => {
             return response.json();
@@ -50,7 +52,7 @@ export default function Home() {
             setDealerHand([...dealerHand, data.cards[0]]);
             setRemainingCards(data.remaining);
           })
-          .catch(error => HandleError(error));
+          .catch(error => HandleError(error, true));
       }
       else if (stand) {
         setStand(false);
@@ -64,36 +66,55 @@ export default function Home() {
     if (CalculateScore(playerHand) > 21) EndRound();
   }, [playerHand]);
 
-  // useEffect(() => {
-    // if (playing) {
-      // if (CalculateScore(playerHand === 21 && CalculateScore(dealerHand) === 21)) {
-        // setRoundOverMsg("Both got blackjack! You get your bet back.");
-        // setMoney(money + betMoney);
-      // } else if (CalculateScore(playerHand) === 21) {
-        // setRoundOverMsg("Blackjack! You get " + betMoney * 3 + "!");
-        // setMoney(money + betMoney * 3);
-      // } else if (CalculateScore(dealerHand) === 21) setRoundOverMsg("Dealer got blackjack! You lose.");
-    // }
-  // }, [playing])
+  useEffect(() => {
+    CheckBlackJack();
+  }, [playerHand, dealerHand]);
 
-  function HandleError(error) {
+  useEffect(() => setPlayError(""), [betMoney]);
+
+  function CheckBlackJack() {
+    if (playerHand.length === 2 && dealerHand.length === 2) {
+      if (CalculateScore(playerHand) === 21 && CalculateScore(dealerHand) === 21) {
+        setRoundOverMsg("Both got blackjack! You get your bet back.");
+        setMoney(money + betMoney);
+        setHideCard(false);
+      } else if (CalculateScore(playerHand) === 21) {
+        setRoundOverMsg("Blackjack! You get " + betMoney * 3 + "!");
+        setMoney(money + betMoney * 3);
+        setHideCard(false);
+      } else if (CalculateScore(dealerHand) === 21) {
+        setHideCard(false);
+        setRoundOverMsg("Dealer got blackjack! You lose.");
+      }
+    }
+  }
+
+  function HandleError(error, abort = false) {
     console.error(error);
     setPlayError("Error: " + error);
-    if (playerHand.length === 0 || dealerHand.length === 0) ToBet();
+    if (abort) {
+      setMoney(money + betMoney);
+      ToBet();
+    }
   }
 
   async function DealHands() {
     setPlayError("");
-    console.log(playerHand.length);
+    if (betMoney === 0) {
+      setPlayError("Error: Need bet to start the game");
+      return;
+    }
+    setHideCard(true);
     await fetch(`https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=2`)
       .then(response => {
         return response.json();
       })
       .then(data => {
-        setPLayerHand(data.cards);
+        setPlayerHand(data.cards);
         setRemainingCards(data.remaining);
+        setPLaying(true);
       })
-      .catch(error => HandleError(error));
+      .catch(error => HandleError(error, true));
     await fetch(`https://deckofcardsapi.com/api/deck/${deckId}/draw/?count=2`)
       .then(response => {
         return response.json();
@@ -101,13 +122,14 @@ export default function Home() {
       .then(data => {
         setDealerHand(data.cards);
         setRemainingCards(data.remaining);
+        setPLaying(true);
       })
-      .catch(error => HandleError(error));
+      .catch(error => HandleError(error, true));
     setMoney(money - betMoney);
-    setPLaying(true);
   }
 
   function EndRound() {
+    setHideCard(false);
     const playerScore = CalculateScore(playerHand);
     const dealerScore = CalculateScore(dealerHand);
     if (playerScore > 21) setRoundOverMsg("Player bust! You lose.");
@@ -140,13 +162,9 @@ export default function Home() {
     return sum;
   }
 
-  async function OnStand() {
-    setStand(true);
-  }
-
   function ToBet() {
     fetch(`https://deckofcardsapi.com/api/deck/${deckId}/shuffle/`);
-    setPLayerHand([]);
+    setPlayerHand([]);
     setDealerHand([]);
     setRoundOverMsg("");
     setPLaying(false);
@@ -159,10 +177,16 @@ export default function Home() {
         return response.json();
       })
       .then(data => {
-        setPLayerHand([...playerHand, data.cards[0]]);
+        setPlayerHand([...playerHand, data.cards[0]]);
         setRemainingCards(data.remaining);
       })
       .catch(error => HandleError(error));
+  }
+
+  function Double() {
+    setBetMoney(betMoney * 2);
+    Hit();
+    setStand(true);
   }
 
   return (
@@ -172,40 +196,46 @@ export default function Home() {
       {playing ?
         <>
           <div className='topHalf'>
-            <AnimatePresence className="cardCon">
-              {dealerHand.map((card, index) => {
-                return (<Card card={card} key={index} />);
-              })}
-            </AnimatePresence>
-            <h2>{CalculateScore(dealerHand)}</h2>
+            <h1 style={{  backgroundColor: "white", padding: 10, fontSize: '1.3em', border: "3px solid black", display: 'block', maxWidth: 200 }}>Your bet: ${betMoney}</h1>
+            <div className="hand">
+              <AnimatePresence>
+                {dealerHand.map((card, index) => {
+                  let r = index === 1 ? hideCard : false;
+                  return (<Card card={card} hide={r} key={index} />);
+                })}
+              </AnimatePresence>
+            </div>
+            <h2>{roundOverMsg === "" & !stand && dealerHand.length > 0 ? CalculateScore([dealerHand[0]]) : CalculateScore(dealerHand)}</h2>
           </div>
           <div className='bottomHalf'>
-            <AnimatePresence className="cardCon">
-              {playerHand.map((card, index) => {
-                return (<Card card={card} key={index} />);
-              })}
-            </AnimatePresence>
+            <div className="hand">
+              <AnimatePresence>
+                {playerHand.map((card, index) => {
+                  return (<Card card={card} hide={false} key={index} />);
+                })}
+              </AnimatePresence>
+            </div>
             <h2>{CalculateScore(playerHand)}</h2>
             {roundOverMsg === "" && !stand ?
               <nav id='gameBtns'>
-                <button onClick={Hit} >SPLIT</button>
+                {playerHand.length === 2 && CalculateScore([playerHand[0]]) === CalculateScore([playerHand[1]]) ? <button onClick={Hit} >SPLIT</button> : null}
+                {playerHand.length === 2 ? <button onClick={Double} >DOUBLE</button> : null}
                 <button onClick={Hit} >HIT</button>
-                <button onClick={OnStand} >STAND</button>
-                <button onClick={Hit} >DOUBLE</button>
+                <button onClick={() => setStand(true)} >STAND</button>
               </nav> :
               roundOverMsg !== "" ?
-                <div>
+                <div id="roundOver">
                   <h1>{roundOverMsg}</h1>
-                  <button onClick={ToBet} >TILBAKE</button>
+                  <button onClick={ToBet} >NEW GAME</button>
                 </div> : null
             }
-            <h1 style={{ position: 'absolute', bottom: 10, left: 10 }}>Your bet: ${betMoney}</h1>
+            
           </div>
         </> :
 
         <>
           <div className='topHalf'>
-            <h1>Your bet: ${betMoney}</h1>
+            <h1 style={{ fontSize: '1.3em',backgroundColor: "white", padding: 10, border: "3px solid black", maxWidth: 200 }}>Your bet: ${betMoney}</h1>
           </div>
           <div className='bottomHalf'>
             <div id="chips">
@@ -216,7 +246,7 @@ export default function Home() {
               <button className="chip" onClick={() => setBetMoney(betMoney + 1000)}>1000</button>
             </div>
             <button onClick={DealHands} className='playBtn' >PLAY</button>
-            <h1 style={{ position: 'absolute', bottom: 10, left: 10 }}>You Have ${money}</h1>
+            <h1 style={{ position: 'absolute', bottom: 10, left: 10, backgroundColor: "white", padding: 10, fontSize: '1.4em', border: "3px solid black" }}>You have: ${money}</h1>
           </div>
         </>}
       {/* <p>Remaining Cards: {remainingCards}</p> */}
@@ -233,6 +263,7 @@ const GlobalStyle = createGlobalStyle`
     background: lightblue;
     width: 100vw;
     height: 50vh;
+    padding: 10px;
   }
   .bottomHalf {
     background: pink;
@@ -240,30 +271,48 @@ const GlobalStyle = createGlobalStyle`
     height: 50vh;
     padding: 10px;
   }
+  .hand {
+    display: flex;
+    flex-wrap: wrap;
+  }
   .playBtn {
     position: absolute;
     bottom: 10px;
     right: 10px;
-    width: 10rem;
-    height: 10rem;
+    width: 10vw;
+    height: 10vw;
+    min-width: 100px;
+    min-height: 100px;
     border-radius: 50%;
     border-style: solid;
     font-size: 2rem;
+    box-shadow: 0 0 5px;
+    background: lightgreen
+  }
+  #roundOver {
+    position: relative;
+    width: 90vw;
+    font-size: 1rem;
+  }
+  #roundOver > button {
+    font-size: 1rem;
   }
   #gameBtns {
     position: absolute;
     bottom: 10px;
     right: 10px;
+    display: flex;
   }
   #gameBtns > button {
-    width: 6em;
-    height: 6em;
+    width: 20vw;
+    height: 20vw;
+    min-width: 50px;
+    min-height: 50px;
+    max-width: 150px;
+    max-height: 150px;
     border-radius: 50%;
     border-style: solid;
     font-size: 1.5rem;
-  }
-  .cardCon {
-    transform-style: preserve-3d;
   }
   #errorBar {
     width: 100vw;
@@ -277,18 +326,24 @@ const GlobalStyle = createGlobalStyle`
   #chips {
     position: relative;
     max-width: 70%;
-    gap: 5px;
+    gap: 10px;
     display: flex;
+    flex-wrap: wrap;
   }
   .chip {
-    width: 6em;
-    height: 6em;
+    width: 20vw;
+    height: 20vw;
+    min-width: 50px;
+    min-height: 50px;
+    max-width: 150px;
+    max-height: 150px;
     border-radius: 50%;
     border-style: dashed;
-    border-width: 0.5em;
+    border-width: 1vw;
     border-color: green;
     background: white;
     font-size: 1.5rem;
+    box-shadow: 5px 10px 3px;
   }
 `;
 
