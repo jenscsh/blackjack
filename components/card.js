@@ -14,15 +14,19 @@ export default function Card(props) {
         setSuit(props.card.suit);
     }, [])
     return (
-        <AnimatePresence>
-            <motion.img
-                src={image}
-                alt={value + ' of ' + suit}
-                initial={{ x: 1000, rotateY: 180 }}
-                animate={{ x: 0, rotateY: 0 }}
-                exit={{ x: -25 }}
-                style={{ maxHeight: 314 }}
-            />
-        </AnimatePresence>
+        <motion.img
+            src={image}
+            alt={value + ' of ' + suit}
+            transition={{ duration: 1, type: "tween", ease: "easeOut", }}
+            initial={{ x: 1000, rotateY: 180 }}
+            animate={{ x: 0, rotateY: 0 }}
+            exit={{ x: -25 }}
+            style={CardStyle}
+        />
     )
+}
+
+const CardStyle = {
+    height: 10 + 'rem',
+    backfaceVisibility: 'hidden'
 }
