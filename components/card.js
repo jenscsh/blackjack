@@ -2,20 +2,24 @@ import { useAnimation, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 export default function Card(props) {
+    //Verdier som blir hentet inn om kortet + referanse til kortrygg-bilde
     const cardback = '/green_back.png';
     const [image, setImage] = useState(cardback);
     const [value, setValue] = useState(props.card.value);
     const [suit, setSuit] = useState(props.card.suit);
     const [hide, setHide] = useState(props.hide);
 
+    //Animasjonsreferanse
     const ani = useAnimation();
 
+    //De forskjellige animasjonene som brukes
     const variants = {
-        init: { x: 100, rotateY: 180 },
+        init: { x: -200, rotateY: 180 },
         reveal: { x: 0, rotateY: 0 },
         hidden: { x: 0, rotateY: 180 }
     }
 
+    //Endrer på verdiene når props blir forandret
     useEffect(() => {
         setImage(props.card.image);
         setValue(props.card.value);
@@ -23,12 +27,14 @@ export default function Card(props) {
         setHide(props.hide);
     }, [props]);
 
+    //Bytter mellom skjult kort og framvist når hide endres
     useEffect(() => {
         if (hide) ani.start("hidden");
         else ani.start("reveal");
     }, [hide]);
 
     return (
+        //Beholder for to bilder som gir en 3D effekt
         <motion.div
             transition={{ duration: 1, type: "tween", ease: "easeOut", }}
             variants={variants}
@@ -41,11 +47,13 @@ export default function Card(props) {
                 src={image}
                 alt={value + ' of ' + suit}
                 style={FrontCardStyle}
+                aria-hidden={hide ? "true" : "false"}
             />
             <motion.img
                 src={cardback}
-                alt="Back of card"
+                alt="A card with the face down"
                 style={BackCardStyle}
+                aria-hidden={hide ? "false" : "true"}
             />
         </motion.div>
     )
